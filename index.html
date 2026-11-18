@@ -1,0 +1,571 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>rt:bar コマンドメーカー</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=M+PLUS+1p:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* layout: form on the left, the live command (a chat bar) pinned on the right; one column on phones */
+:root {
+  --bg: #eef1ec; --panel: #ffffff; --ink: #1d2420; --muted: #5d6a62; --line: #d3dbd5;
+  --accent: #3d8b3d; --accent-ink: #ffffff; --chat: #1b1f1c; --chat-ink: #e9f2ea; --warn: #b5541a;
+  --soft: #e4ebe4;
+  --body: "M PLUS 1p", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #141815; --panel: #1d221e; --ink: #e5ece6; --muted: #9aa69e; --line: #2f3731;
+  --accent: #6cc46c; --accent-ink: #0e1a0e; --chat: #0b0d0b; --chat-ink: #e9f2ea; --warn: #f0965c; --soft: #252b26; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #141815; --panel: #1d221e; --ink: #e5ece6; --muted: #9aa69e; --line: #2f3731;
+  --accent: #6cc46c; --accent-ink: #0e1a0e; --chat: #0b0d0b; --chat-ink: #e9f2ea; --warn: #f0965c; --soft: #252b26; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 14px; line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 20px 40px }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 440px); gap: 20px; align-items: start }
+@media (max-width: 880px) { .wrap { grid-template-columns: minmax(0, 1fr) } }
+header { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px }
+h1 { font-size: 22px; margin: 0; text-wrap: balance }
+h1 code { font-family: var(--mono); color: var(--accent) }
+header p { margin: 0; color: var(--muted) }
+.form { display: grid; gap: 14px; min-width: 0 }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: grid; gap: 10px; min-width: 0 }
+section h2 { margin: 0; font-size: 13px; letter-spacing: .06em; color: var(--muted); font-weight: 700 }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px }
+label { display: grid; gap: 3px; font-size: 12px; color: var(--muted); min-width: 0 }
+label.wide { grid-column: 1 / -1 }
+input, select { font: inherit; font-size: 14px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; width: 100%; min-width: 0 }
+input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px }
+.types { display: flex; flex-wrap: wrap; gap: 6px }
+.types button, .chip { font: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 5px 12px; cursor: pointer }
+.types button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); border-color: var(--accent) }
+.hint { font-size: 12px; color: var(--muted); margin: 0 }
+.rule { display: grid; grid-template-columns: 140px minmax(0, 1fr) minmax(0, 1fr) 120px 70px 32px; gap: 6px; align-items: end }
+@media (max-width: 700px) { .rule { grid-template-columns: 1fr 1fr } }
+.del { font: inherit; background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; height: 32px; cursor: pointer }
+.add { justify-self: start; font: inherit; background: var(--soft); border: 1px dashed var(--line); color: var(--ink); border-radius: 6px; padding: 6px 12px; cursor: pointer }
+.out { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 12px); display: grid; gap: 12px; min-width: 0 }
+.chat { background: var(--chat); color: var(--chat-ink); border-radius: 10px; padding: 14px; display: grid; gap: 10px; min-width: 0 }
+.chat .lbl { font-size: 12px; opacity: .7 }
+.cmd { font-family: var(--mono); font-size: 13px; word-break: break-all; white-space: pre-wrap; background: rgba(255,255,255,.06); border-radius: 6px; padding: 10px; min-height: 60px; user-select: all }
+.copy { font: inherit; font-weight: 700; background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 6px; padding: 9px 14px; cursor: pointer }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center }
+.small { font-family: var(--mono); font-size: 12px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.15); color: var(--chat-ink); border-radius: 6px; padding: 5px 8px; cursor: pointer }
+.warn { color: var(--warn); font-size: 12px; margin: 0 }
+.len { font-size: 12px; opacity: .7; font-variant-numeric: tabular-nums }
+.ex { display: flex; flex-wrap: wrap; gap: 6px }
+.preview { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 6px }
+.bar { height: 10px; border-radius: 2px; background: var(--soft); overflow: hidden; display: flex }
+.bar span { display: block; height: 100% }
+.ptitle { font-weight: 700; text-align: center; font-size: 13px }
+[hidden] { display: none !important }
+@media (prefers-reduced-motion: no-preference) { .copy, .chip, .types button { transition: background .15s } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1><code>/rt:bar</code> コマンドメーカー</h1>
+    <p>選んで埋めるだけ。右のコマンドをコピーしてチャットに貼ってください（バーアドオン v1.5.83）。</p>
+  </header>
+
+  <div class="form">
+    <section>
+      <h2>見本から始める</h2>
+      <div class="ex" id="examples"></div>
+    </section>
+
+    <section>
+      <h2>バーの種類</h2>
+      <div class="types" id="types">
+        <button type="button" data-t="timecountdown">⏱ タイマー</button>
+        <button type="button" data-t="countup">カウントアップ</button>
+        <button type="button" data-t="countdown">カウントダウン</button>
+        <button type="button" data-t="percentage">割合（チーム対決）</button>
+      </div>
+      <div class="grid">
+        <label>id（英数字）<input id="id" value="t1"></label>
+        <p class="hint wide" style="grid-column:1/-1">2本のバーを同時表示する場合は、それぞれ別のIDを付けてください。同じIDで set すると、前のバーが置き換わります。</p>
+        <label>タイトル<input id="title" value="残り時間"></label>
+        <label>保存名（プリセット・空でOK）<input id="preset"></label>
+        <label>すぐ始める<select id="autoplay"><option value="on">on</option><option value="off">off（あとで play）</option></select></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>時間・数えるもの</h2>
+      <div class="grid">
+        <label data-only="timecountdown">秒数（time）<input id="time" type="number" min="1" value="180"></label>
+        <label data-only="countup countdown percentage">数える値（use）
+          <input id="use" list="uselist" placeholder="得点 / stat:jumps / stand">
+          <datalist id="uselist">
+            <option value="stat:jumps">ジャンプ回数</option>
+            <option value="stat:kills">倒した数</option>
+            <option value="stat:kills.zombie">ゾンビを倒した数</option>
+            <option value="stat:deaths">やられた数</option>
+            <option value="stat:damage_taken">受けたダメージ</option>
+            <option value="stat:damage_dealt">与えたダメージ</option>
+            <option value="stat:fall_damage">落下ダメージ</option>
+            <option value="stat:drowning_damage">溺れたダメージ</option>
+            <option value="stat:fire_damage">燃えた・溶岩のダメージ</option>
+            <option value="stat:explosion_damage">爆発のダメージ</option>
+            <option value="stat:melee_damage">近接で受けたダメージ</option>
+            <option value="stat:projectile_damage">飛び道具で受けたダメージ</option>
+            <option value="stat:melee_damage_dealt">近接で与えたダメージ</option>
+            <option value="stat:projectile_damage_dealt">飛び道具で与えたダメージ</option>
+            <option value="stat:damage_taken_by.zombie">ゾンビから受けたダメージ</option>
+            <option value="stat:hits_taken_type.fall">落ちた回数（ダメージあり）</option>
+            <option value="stat:health">体力</option>
+            <option value="stat:hunger">満腹度</option>
+            <option value="stat:air">息（秒）</option>
+            <option value="stat:xp.level">経験値レベル</option>
+            <option value="stat:armor.points">防御力</option>
+            <option value="stat:effect_count">かかっている効果の数</option>
+            <option value="stat:fire_seconds">燃えている残り秒</option>
+            <option value="stat:state.sneaking">スニーク中（1/0）</option>
+            <option value="stat:state.low_health">体力が少ない（1/0）</option>
+            <option value="stat:state.underwater">水の中に頭がある（1/0）</option>
+            <option value="stat:state.in_lava">溶岩の中（1/0）</option>
+            <option value="stat:state.on_ice">氷の上（1/0）</option>
+            <option value="stat:state.in_nether">ネザーにいる（1/0）</option>
+            <option value="stat:state.moving">動いている（1/0）</option>
+            <option value="stat:sprint_starts">走り出した回数</option>
+            <option value="stat:time_sprinting_seconds">走った秒数</option>
+            <option value="stat:time_sneaking_seconds">スニークした秒数</option>
+            <option value="stat:time_swimming_seconds">泳いだ秒数</option>
+            <option value="stat:time_underwater_seconds">水中にいた秒数</option>
+            <option value="stat:dives">水に潜った回数</option>
+            <option value="stat:glide_starts">エリトラで飛んだ回数</option>
+            <option value="stat:time_gliding_seconds">エリトラで飛んだ秒数</option>
+            <option value="stat:climb_starts">はしごを登った回数</option>
+            <option value="stat:time_climbing_seconds">登っていた秒数</option>
+            <option value="stat:ride_starts">乗り物に乗った回数</option>
+            <option value="stat:time_riding_seconds">乗っていた秒数</option>
+            <option value="stat:fire_ignitions">燃えた回数</option>
+            <option value="stat:time_on_fire_seconds">燃えていた秒数</option>
+            <option value="stat:time_in_lava_seconds">溶岩にいた秒数</option>
+            <option value="stat:falls">3ブロック以上落ちた回数</option>
+            <option value="stat:max_fall_distance">一番高く落ちた高さ</option>
+            <option value="stat:time_still_seconds">止まっていた秒数</option>
+            <option value="stat:time_moving_seconds">動いていた秒数</option>
+            <option value="stat:time_on_block.sand">砂の上にいた秒数</option>
+            <option value="stat:time_on_block.gold_block">金ブロックの上にいた秒数</option>
+            <option value="stat:time_holding.diamond_sword">ダイヤの剣を持っていた秒数</option>
+            <option value="stat:held_item.diamond">手に持っているダイヤの数</option>
+            <option value="stat:inventory.item.diamond.count">現在のダイヤ所持数</option>
+            <option value="stat:items_obtained.diamond">ダイヤの新規収集数（拾い直しを抑制）</option>
+            <option value="stat:items_picked_up.diamond">ダイヤを拾った累計（拾い直しも加算）</option>
+            <option value="stat:held.count">手に持っている数</option>
+            <option value="stat:slot_changes">持ち替えた回数</option>
+            <option value="stat:distance">歩いた距離</option>
+            <option value="stat:play_time_seconds">遊んだ秒数</option>
+            <option value="stat:scoreboard.points">points のスコアを統計として参照</option>
+            <option value="stat:has_tag.goal">goal タグの人数</option>
+            <option value="stand">チームの台の下のチェスト（割合バー）</option>
+            <option value="stand.red">赤の台（カウンター）</option>
+          </datalist></label>
+        <div data-only="countup countdown percentage" class="wide" style="grid-column:1/-1;display:grid;gap:6px;background:var(--soft);padding:10px;border-radius:6px">
+          <div class="hint"><strong>アイテム収集の設定</strong>（アイテムIDを指定して use に反映）</div>
+          <div class="grid">
+            <label>計測方法<select id="itemmode"><option value="obtained">新規収集数（おすすめ）</option><option value="inventory">現在の所持数</option><option value="pickup">拾った累計（拾い直しも加算）</option></select></label>
+            <label>アイテムID<input id="itemid" value="diamond" placeholder="diamond / minecraft:emerald"></label>
+          </div>
+          <button type="button" class="add" id="applyItem">このアイテムを数える</button>
+          <p class="hint" id="itemHint"></p>
+        </div>
+        <div data-only="countup countdown percentage" class="wide" style="grid-column:1/-1;display:grid;gap:6px;background:var(--soft);padding:10px;border-radius:6px">
+          <div class="hint"><strong>スコアボードの設定</strong>（スコアボード名を指定して use に反映）</div>
+          <div class="grid">
+            <label>参照方法<select id="scoremode"><option value="direct">直接参照（use=名前）</option><option value="stat">統計として参照（stat:scoreboard.名前）</option></select></label>
+            <label>スコアボード名<input id="scoreid" value="points" placeholder="points / 得点" autocomplete="off"></label>
+          </div>
+          <button type="button" class="add" id="applyScore">このスコアボードを使う</button>
+          <p class="hint" id="scoreHint" aria-live="polite"></p>
+          <p class="hint">適用すると reset=off（既存の得点を保持）に設定します。変更したい場合は下の「始めたら0に戻す」で指定できます。</p>
+        </div>
+        <label data-only="countup countdown">最大（max）<input id="max" type="number" value="10"></label>
+        <label data-only="percentage">チーム（group）<input id="group" value="red|blue" placeholder="red|blue|yellow"></label>
+        <label data-only="countup countdown percentage">時計を付ける秒数（timer）<input id="timer" type="number" min="0" placeholder="空なら無し"></label>
+        <label data-only="countup countdown percentage">数える人（target）<input id="target" placeholder="all / team:red / tag:vip"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>見た目</h2>
+      <div class="grid">
+        <label data-only="timecountdown">バーの見た目（style）<select id="style"><option value="">ボスバー風</option><option value="xp">経験値バー風</option></select></label>
+        <label data-only="timecountdown">時計（format）<select id="tformat"><option value="">01:30</option><option value="ss">90（秒だけ）</option></select></label>
+        <label data-only="countup countdown">数字（format）<select id="cformat"><option value="">4/10</option><option value="percent">40%</option><option value="remain">あと 6</option><option value="value">4</option></select></label>
+        <label data-only="percentage">数字（show）<select id="show"><option value="">出さない</option><option value="percent">60%/40%</option><option value="value">12/8</option><option value="both">両方</option></select></label>
+        <label data-only="timecountdown countup countdown">はじめの色（colorF）<select id="colorF" class="color"></select></label>
+        <label data-only="timecountdown countup countdown">中盤の色（colorM）<select id="colorM" class="color"></select></label>
+        <label data-only="timecountdown countup countdown">終盤の色（colorE）<select id="colorE" class="color"></select></label>
+        <label>タイトルを出す<select id="usetitle"><option value="">on</option><option value="off">off</option></select></label>
+        <label>数字・時計を出す<select id="usetimer"><option value="">on</option><option value="off">off</option></select></label>
+        <label>見る人（view）<input id="view" placeholder="all / tag:vip / area:0.60.0.20.80.20"></label>
+        <label>優先度（priority）<input id="priority" type="number" placeholder="大きいほど優先"></label>
+        <label>2本表示の位置（slot）<select id="slot"><option value="">自動（優先度順）</option><option value="top">上段</option><option value="bottom">下段</option></select></label>
+        <label data-only="countup countdown percentage">自分の記録（self）<select id="self"><option value="">表示（初期設定）</option><option value="on">表示する</option><option value="off">表示しない</option></select></label>
+        <label data-only="percentage">自分のチームの記録（teamscore）<select id="teamscore"><option value="">表示しない（初期設定）</option><option value="on">表示する</option><option value="off">表示しない</option></select></label>
+        <label data-only="countup countdown percentage">自分の記録の見出し（selflabel）<input id="selflabel" maxlength="12" placeholder="自（省略時は従来どおり）" autocomplete="off"></label>
+        <label data-only="percentage">チーム記録の見出し（teamlabel）<input id="teamlabel" maxlength="12" placeholder="組（省略時は従来どおり）" autocomplete="off"></label>
+        <p data-only="countup countdown percentage" class="hint wide">例：selflabel=個人:、teamlabel=チーム: で「個人:7 チーム:15」。見出しを消したいときは「-」を入力してください。</p>
+        <label data-only="countup countdown percentage">横に並べる時計（clock）<input id="clock" placeholder="タイマーの id"></label>
+      </div>
+    </section>
+
+    <section data-only="percentage">
+      <h2>割合バーのチーム設定</h2>
+      <div class="grid">
+        <label>勝ち（win %）<input id="win" type="number" placeholder="例 75"></label>
+        <label>差で勝ち（winby %）<input id="winby" type="number" placeholder="例 30"></label>
+        <label>数え方（basis）<select id="basis"><option value="">合計</option><option value="avg">1人あたりの平均</option><option value="max">一番の人</option></select></label>
+        <label>最低の幅（minshare %）<input id="minshare" type="number" placeholder="例 5"></label>
+        <label>人のいないチーム（empty）<select id="empty"><option value="">外す</option><option value="show">残す</option></select></label>
+        <label>全部0のとき（zero）<select id="zero"><option value="">均等</option><option value="empty">空</option></select></label>
+      </div>
+      <div id="teamrows" class="grid"></div>
+      <p class="hint">名前はメッセージの {teamname} に入ります。倍率・足す数はハンデ（値×倍率＋足す数）。</p>
+    </section>
+
+    <section>
+      <h2>音・メッセージ</h2>
+      <div class="grid">
+        <label>開始のメッセージ（message0/1）<input id="mStart" placeholder="スタート！"></label>
+        <label>半分のメッセージ（message1/2）<input id="mHalf" placeholder="半分！"></label>
+        <label>終了のメッセージ（message1/1）<input id="mEnd" placeholder="終了！"></label>
+        <label>出し先（msgto）<select id="msgto"><option value="">チャット</option><option value="title">画面の真ん中</option><option value="actionbar">ホットバーの上</option></select></label>
+        <label>送る人（msgtarget）<select id="msgtarget"><option value="">バーを見ている人</option><option value="all">全員</option></select></label>
+        <label>終了の音（sound）<input id="sound" list="soundlist" placeholder="random.levelup">
+          <datalist id="soundlist"><option value="random.levelup"></option><option value="random.orb"></option><option value="note.pling"></option><option value="note.bell"></option><option value="note.bass"></option><option value="raid.horn"></option><option value="random.click"></option><option value="random.toast"></option></datalist></label>
+        <label>残り何秒からチクタク（tick）<input id="tick" type="number" placeholder="例 10"></label>
+        <label>チクタクの音（ticksound）<input id="ticksound" list="soundlist" placeholder="random.click"></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>終わったら・スコアボード</h2>
+      <div class="grid">
+        <label>終わったら（onend）<select id="onend"><option value="">そのまま残す</option><option value="loop">最初から繰り返す</option><option value="remove">消す</option></select></label>
+        <label>終わった時の文字（endtext）<input id="endtext" placeholder="終了"></label>
+        <label>何秒後に消す（hideafter）<input id="hideafter" type="number"></label>
+        <label>スコアで消す（hidewhen）<input id="hidewhen" placeholder="ゲーム状態:0"></label>
+        <label>スコアボードに書く（link）<input id="link" placeholder="残り時間"></label>
+        <label data-only="countup countdown">始まりの値（from）<input id="from" type="number" placeholder="0"></label>
+        <label data-only="countup countdown">最大で止める（cap）<select id="cap"><option value="">on</option><option value="off">off（超えても数える）</option></select></label>
+        <label data-only="countup countdown percentage">始めたら0に戻す（reset）<select id="reset"><option value="">on</option><option value="off">off</option></select></label>
+      </div>
+    </section>
+
+    <section>
+      <h2>きっかけ（条件で何かを起こす）</h2>
+      <div id="rules" style="display:grid;gap:8px"></div>
+      <button type="button" class="add" id="addRule">＋ きっかけを足す</button>
+      <p class="hint">条件の例：<code>value>=10</code>（値が10以上）・<code>left<=5</code>（残り5以下）・<code>1/2</code>（半分）・<code>start</code>・<code>end</code>・割合なら <code>red>=60</code> <code>any>=60</code> <code>red-blue>=20</code> <code>lead=red</code> <code>leadchange</code> <code>tie</code>。コマンドとメッセージに {teamname} {team} {value} {percent} が使えます。</p>
+    </section>
+
+    <section>
+      <h2>その他（自由に足す）</h2>
+      <label class="wide">そのまま足す設定（カンマ区切り）<input id="extra" placeholder="color3/4=purple,reach3/4=note.bell"></label>
+    </section>
+  </div>
+
+  <aside class="out">
+    <div class="preview" aria-hidden="true">
+      <div class="ptitle" id="pTitle">残り時間 03:00</div>
+      <div class="bar" id="pBar"></div>
+    </div>
+    <div class="chat">
+      <div class="row" style="justify-content:space-between"><span class="lbl">チャットに貼るコマンド</span><span class="len" id="len"></span></div>
+      <div id="cmds" style="display:grid;gap:10px"></div>
+      <span class="lbl" id="copied" aria-live="polite"></span>
+      <p class="warn" id="warn" hidden></p>
+      <div class="lbl">あとで使うコマンド</div>
+      <div class="row" id="ops"></div>
+    </div>
+  </aside>
+</div>
+
+<script>
+const COLORS = { "": "（そのまま）", blue: "青", red: "赤", green: "緑", yellow: "黄", purple: "紫", orange: "橙", white: "白" };
+const SWATCH = { blue: "#1eafff", red: "#f01414", green: "#2ecc40", yellow: "#ffd400", purple: "#a54bff", orange: "#ff8a1e", white: "#f2f2f2",
+  cyan: "#28d7e6", pink: "#ff6fbf" };
+const TEAMS = [["red", "赤"], ["blue", "青"], ["yellow", "黄"], ["green", "緑"], ["cyan", "水色"], ["purple", "紫"], ["orange", "橙"], ["pink", "桃"]];
+const $ = (id) => document.getElementById(id);
+let type = "timecountdown";
+
+document.querySelectorAll("select.color").forEach((s) => {
+  s.innerHTML = Object.entries(COLORS).map(([v, n]) => `<option value="${v}">${n}</option>`).join("");
+});
+$("teamrows").innerHTML = TEAMS.map(([t, n]) => `
+  <label>${n}の名前<input id="name_${t}" placeholder="${n}組"></label>
+  <label>${n}の色<select id="color_${t}"><option value="">（チームの色）</option>${TEAMS.map(([v, m]) => `<option value="${v}">${m}</option>`).join("")}</select></label>
+  <label>${n}の倍率<input id="mul_${t}" type="number" step="0.1" placeholder="1"></label>
+  <label>${n}に足す<input id="add_${t}" type="number" placeholder="0"></label>`).join("");
+
+function addRule(r = {}) {
+  const div = document.createElement("div");
+  div.className = "rule";
+  const n = $("rules").children.length + 1;
+  div.innerHTML = `
+    <label>条件<input class="r-when" value="${r.when || ""}" placeholder="value>=10" id="rw${n}${Date.now()}"></label>
+    <label>コマンド（run）<input class="r-run" value="${r.run || ""}" placeholder="give @a diamond 1" id="rr${n}${Date.now()}"></label>
+    <label>メッセージ（msg）<input class="r-msg" value="${r.msg || ""}" placeholder="10点！" id="rm${n}${Date.now()}"></label>
+    <label>音<input class="r-sound" list="soundlist" value="${r.sound || ""}" id="rs${n}${Date.now()}"></label>
+    <label>何回<select class="r-once" id="ro${n}${Date.now()}"><option value="">1回</option><option value="off" ${r.once === "off" ? "selected" : ""}>毎回</option></select></label>
+    <button type="button" class="del" title="消す">×</button>`;
+  div.querySelector(".del").onclick = () => { div.remove(); build(); };
+  div.addEventListener("input", build);
+  $("rules").appendChild(div);
+}
+$("addRule").onclick = () => { addRule(); build(); };
+
+function setType(t) {
+  type = t;
+  document.querySelectorAll("#types button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.t === t));
+  document.querySelectorAll("[data-only]").forEach((el) => { el.hidden = !el.dataset.only.split(" ").includes(t); });
+  build();
+}
+document.querySelectorAll("#types button").forEach((b) => b.onclick = () => setType(b.dataset.t));
+
+const v = (id) => { const el = $(id); return el && !el.closest("[hidden]") ? String(el.value).trim() : ""; };
+
+const ITEM_HINTS = {
+  obtained: "新しく拾った累計個数。捨てて拾い直した分は可能な範囲で差し引きます。拾ったアイテムの消滅・焼失などで計測がずれる場合があります。",
+  inventory: "現在持っている数。チェストに入れたりクラフトに使ったりすると減ります。",
+  pickup: "地面から拾った累計。捨てて拾い直すたびに加算されます。新規収集競技には非推奨です。"
+};
+function updateItemHint() { $("itemHint").textContent = ITEM_HINTS[$("itemmode").value] || ""; }
+$("itemmode").addEventListener("change", updateItemHint);
+$("applyItem").onclick = () => {
+  const raw = $("itemid").value.trim().toLowerCase();
+  const item = raw.replace(/^minecraft:/, "");
+  if (!/^[a-z0-9_]+$/.test(item)) { $("itemHint").textContent = "バニラのアイテムIDを入力してください（例 diamond / minecraft:emerald）。"; return; }
+  const mode = $("itemmode").value;
+  $("use").value = mode === "inventory" ? `stat:inventory.item.${item}.count` : mode === "obtained" ? `stat:items_obtained.${item}` : `stat:items_picked_up.${item}`;
+  updateItemHint(); build();
+};
+
+const SCORE_HINTS = {
+  direct: "スコアボードの値を直接使用。既存の得点システムをそのままバーに表示できます。",
+  stat: "スコアボードを読み取り用の統計として参照。独自の計算式でも scoreboard.名前 を使用できます。"
+};
+function updateScoreHint() {
+  const name = $("scoreid").value.trim();
+  const mode = $("scoremode").value;
+  $("scoreHint").textContent = SCORE_HINTS[mode] + (name ? "  use=" + (mode === "stat" ? "stat:scoreboard." : "") + name : "");
+}
+$("scoremode").addEventListener("change", updateScoreHint);
+$("scoreid").addEventListener("input", updateScoreHint);
+$("applyScore").onclick = () => {
+  const name = $("scoreid").value.trim();
+  const mode = $("scoremode").value;
+  if (!name || /[\s,\[\]"':|]/.test(name) || (mode === "stat" && name.includes(".")) || name === "stand" || name.startsWith("stand.")) {
+    $("scoreHint").textContent = "スコアボードのIDを入力してください（例 points / 得点）。空白・区切り記号は使用できません。統計参照ではピリオドも使用できません。stand は専用の値です。";
+    return;
+  }
+  $("use").value = (mode === "stat" ? "stat:scoreboard." : "") + name;
+  $("reset").value = "off";
+  updateScoreHint();
+  $("scoreHint").textContent += "（適用済み・reset=off）";
+  build();
+};
+
+function build() {
+  const parts = [["type", type]];
+  const put = (k, val) => { if (val !== "" && val != null) parts.push([k, val]); };
+  if (type === "timecountdown") { put("time", v("time")); put("style", v("style")); put("format", v("tformat")); }
+  else {
+    put("use", v("use"));
+    if (type !== "percentage") { put("max", v("max")); put("format", v("cformat")); put("from", v("from")); put("cap", v("cap")); }
+    else { put("group", v("group")); put("show", v("show")); }
+    put("target", v("target")); put("timer", v("timer")); put("reset", v("reset")); put("clock", v("clock"));
+  }
+  put("title", v("title"));
+  ["usetitle", "usetimer", "colorF", "colorM", "colorE", "view", "priority", "slot"].forEach((k) => put(k, v(k)));
+  if (type !== "timecountdown") { put("self", v("self")); put("selflabel", v("selflabel")); }
+  if (type === "percentage") { put("teamscore", v("teamscore")); put("teamlabel", v("teamlabel")); }
+  if (type === "percentage") {
+    ["win", "winby", "basis", "minshare", "empty", "zero"].forEach((k) => put(k, v(k)));
+    TEAMS.forEach(([t]) => { put("name" + t, v("name_" + t)); put("color" + t, v("color_" + t)); put("mul" + t, v("mul_" + t)); put("add" + t, v("add_" + t)); });
+  }
+  put("message0/1", v("mStart")); put("message1/2", v("mHalf")); put("message1/1", v("mEnd"));
+  put("msgto", v("msgto")); put("msgtarget", v("msgtarget")); put("sound", v("sound"));
+  put("tick", v("tick")); put("ticksound", v("ticksound"));
+  put("onend", v("onend")); put("endtext", v("endtext")); put("hideafter", v("hideafter")); put("hidewhen", v("hidewhen")); put("link", v("link"));
+  let i = 0;
+  const warns = [];
+  $("rules").querySelectorAll(".rule").forEach((row) => {
+    const w = row.querySelector(".r-when").value.trim();
+    if (!w) return;
+    i++;
+    parts.push(["when" + i, w]);
+    const run = row.querySelector(".r-run").value.trim().replace(/^\//, "");
+    const msg = row.querySelector(".r-msg").value.trim();
+    const snd = row.querySelector(".r-sound").value.trim();
+    const once = row.querySelector(".r-once").value;
+    if (run) parts.push(["run" + i, run]);
+    if (msg) parts.push(["msg" + i, msg]);
+    if (snd) parts.push(["sound" + i, snd]);
+    if (once) parts.push(["once" + i, once]);
+    if (/,/.test(run.replace(/\[[^\]]*\]/g, ""))) warns.push(`きっかけ${i}のコマンドに [ ] の外のカンマがあります（区切りと間違えられます）。`);
+    if (/,/.test(msg)) warns.push(`きっかけ${i}のメッセージにカンマがあります。「、」に変えてください。`);
+  });
+  put("autoplay", v("autoplay") === "on" ? "on" : "");
+  const extra = v("extra");
+  ["title", "mStart", "mHalf", "mEnd", "endtext", "selflabel", "teamlabel"].forEach((id) => {
+    if (/[,"\[\]§\r\n]/.test(v(id))) warns.push(`「${$(id).closest("label").firstChild.textContent.trim()}」に , " [ ] 改行 § は使えません。`);
+  });
+  const id = v("id") || "t1";
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) warns.push("id は英数字と _ - だけにしてください。");
+  if (type !== "timecountdown" && !v("use")) warns.push("「数える値（use）」を入れてください。");
+  if (type !== "timecountdown" && /^stat:items_picked_up(?:\.|$)/i.test(v("use"))) warns.push("拾った累計は、同じアイテムを拾い直しても増えます。新規収集数（items_obtained）も選べます。 ");
+  // A long command crashes the game, so long ones are split into several
+  // shorter ones: each later one adds to the same saved settings (preset).
+  const LIMIT = 330;
+  const items = parts.filter(([k]) => k !== "autoplay").map(([k, val]) => k + "=" + val);
+  if (extra) items.push(extra.replace(/^,+|,+$/g, ""));
+  const autoplay = parts.some(([k]) => k === "autoplay");
+  const quote = (n) => (/^\d/.test(n) || /\s/.test(n) ? `"${n}"` : n);
+  const make = (list, last, name) => `/rt:bar set "${id}[${list.concat(last && autoplay ? ["autoplay=on"] : []).join(",")}]"` + (name ? " " + quote(name) : "");
+  let preset = v("preset");
+  let cmds = [make(items, true, preset)];
+  if (cmds[0].length > LIMIT) {
+    if (!preset) preset = id + "の設定";
+    const chunks = [[]];
+    for (const it of items) {
+      const cur = chunks[chunks.length - 1];
+      if (cur.length && make(cur.concat([it]), true, preset).length > LIMIT) chunks.push([it]);
+      else cur.push(it);
+    }
+    cmds = chunks.map((c, k) => make(c, k === chunks.length - 1, preset));
+  }
+  const box = $("cmds");
+  box.innerHTML = cmds.map((c, k) => `
+    ${cmds.length > 1 ? `<div class="lbl">${k + 1}/${cmds.length}つ目${k === 0 ? "（長いので分けました。上から順に打ってください）" : ""}</div>` : ""}
+    <div class="cmd">${c.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</div>
+    <div class="row"><button type="button" class="copy" data-k="${k}">コピー${cmds.length > 1 ? "（" + (k + 1) + "）" : ""}</button></div>`).join("");
+  box.querySelectorAll("button.copy").forEach((b) => b.onclick = () => copyText(cmds[Number(b.dataset.k)], b));
+  $("len").textContent = cmds.map((c) => c.length).join(" + ") + " 文字";
+  if (cmds.length > 1) warns.push(`1つのコマンドが長すぎるとゲームが落ちるので、${cmds.length}つに分けました。設定は保存名「${preset}」に足されていき、最後のコマンドで始まります。`);
+  $("warn").hidden = !warns.length; $("warn").textContent = warns.join(" ");
+  $("ops").innerHTML = ["play", "stop", "remove"].map((op) => `<button type="button" class="small" data-c="/rt:bar ${op} ${id}">/rt:bar ${op} ${id}</button>`).join("")
+    + `<button type="button" class="small" data-c="/rt:bar remove all">/rt:bar remove all</button>`;
+  $("ops").querySelectorAll("button").forEach((b) => b.onclick = () => copyText(b.dataset.c, b));
+  preview();
+}
+
+function preview() {
+  const t = v("title");
+  let num = "";
+  if (type === "timecountdown") { const s = Number(v("time")) || 0; num = v("tformat") === "ss" ? String(s) : String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0"); }
+  else if (type === "percentage") { const sh = v("show"); num = sh === "percent" ? "60%/40%" : sh === "value" ? "12/8" : sh === "both" ? "12/8 60%/40%" : ""; }
+  else { const m = Number(v("max")) || 10; const f = v("cformat"); const val = Math.round(m * 0.4); num = f === "percent" ? "40%" : f === "remain" ? String(m - val) : f === "value" ? String(val) : `${val}/${m}`; }
+  const showTeamScore = type === "percentage" && v("teamscore") === "on";
+  const showSelf = type !== "timecountdown" && v("self") !== "off"
+    && (showTeamScore || type === "percentage" || !!v("timer") || !!v("clock"));
+  const customLabel = (id, fallback) => v(id) === "-" ? "" : (v(id) || fallback);
+  const scores = [];
+  if (showSelf) scores.push(customLabel("selflabel", showTeamScore ? "自" : "") + "7");
+  if (showTeamScore) scores.push(customLabel("teamlabel", "組") + "15");
+  num = [num, ...scores].filter(Boolean).join(" ");
+  if (v("usetimer") === "off" && type !== "percentage") num = "";
+  $("pTitle").textContent = [v("usetitle") === "off" ? "" : t, num].filter(Boolean).join(" ") || " ";
+  const bar = $("pBar");
+  if (type === "percentage") {
+    const g = (v("group") || "red|blue").split("|").map((x) => x.trim().toLowerCase()).filter((x) => SWATCH[x]);
+    const w = g.length ? 100 / g.length : 100;
+    bar.innerHTML = g.map((x, k) => `<span style="width:${k === 0 ? 60 : (40 / Math.max(1, g.length - 1))}%;background:${SWATCH[v("color_" + x)] || SWATCH[x]}"></span>`).join("");
+  } else {
+    const c = SWATCH[v("colorF")] || (v("style") === "xp" ? "#7fe23f" : SWATCH.blue);
+    bar.innerHTML = `<span style="width:${type === "timecountdown" ? 100 : 40}%;background:${c}"></span>`;
+  }
+}
+
+async function copyText(text, btn) {
+  try { await navigator.clipboard.writeText(text); flash(btn, "コピーしました"); }
+  catch (e) {
+    const target = btn.classList.contains("copy") ? btn.closest(".row").previousElementSibling : btn;
+    const r = document.createRange(); r.selectNodeContents(target);
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r); flash(btn, "選択しました。長押し／Ctrl+C でコピー");
+  }
+}
+function flash(btn, msg) { $("copied").textContent = msg; setTimeout(() => { $("copied").textContent = ""; }, 2500); }
+
+const RANDOM_STATS = ["stat:jumps", "stat:kills", "stat:kills.zombie", "stat:deaths", "stat:damage_taken", "stat:damage_dealt", "stat:fall_damage", "stat:drowning_damage", "stat:fire_damage", "stat:explosion_damage", "stat:melee_damage", "stat:projectile_damage", "stat:melee_damage_dealt", "stat:projectile_damage_dealt", "stat:damage_taken_by.zombie", "stat:hits_taken_type.fall", "stat:health", "stat:hunger", "stat:air", "stat:xp.level", "stat:armor.points", "stat:effect_count", "stat:fire_seconds", "stat:state.sneaking", "stat:state.low_health", "stat:state.underwater", "stat:state.in_lava", "stat:state.on_ice", "stat:state.in_nether", "stat:state.moving", "stat:sprint_starts", "stat:time_sprinting_seconds", "stat:time_sneaking_seconds", "stat:time_swimming_seconds", "stat:time_underwater_seconds", "stat:dives", "stat:glide_starts", "stat:time_gliding_seconds", "stat:climb_starts", "stat:time_climbing_seconds", "stat:ride_starts", "stat:time_riding_seconds", "stat:fire_ignitions", "stat:time_on_fire_seconds", "stat:time_in_lava_seconds", "stat:falls", "stat:max_fall_distance", "stat:time_still_seconds", "stat:time_moving_seconds", "stat:time_on_block.sand", "stat:time_on_block.gold_block", "stat:time_holding.diamond_sword", "stat:held_item.diamond", "stat:items_obtained.diamond", "stat:inventory.item.diamond.count", "stat:held.count", "stat:slot_changes", "stat:distance", "stat:play_time_seconds", "stat:has_tag.goal"];
+const EXAMPLES = {
+  "2本表示・上段タイマー": { type: "timecountdown", slot: "top", id: "timer", title: "残り時間", time: 300, colorF: "blue" },
+  "2本表示・下段討伐": { type: "countup", slot: "bottom", id: "kills", title: "ゾンビ討伐", use: "stat:kills.zombie", max: 20, colorF: "green" },
+  "3分タイマー": { type: "timecountdown", id: "t1", title: "残り時間", time: 180, colorF: "blue", colorM: "yellow", colorE: "red", mStart: "スタート！", mHalf: "半分！", mEnd: "タイムアップ！", msgto: "title", msgtarget: "all", sound: "random.levelup", tick: 10, link: "残り時間" },
+  "繰り返す15秒": { type: "timecountdown", id: "r1", title: "ラウンド", time: 15, style: "xp", tformat: "ss", onend: "loop", mStart: "ラウンド開始", msgto: "actionbar", tick: 5 },
+  "得点カウンター": { type: "countup", id: "c1", title: "得点", use: "得点", max: 20, colorF: "red", colorM: "yellow", colorE: "green", mEnd: "20点達成！", msgto: "title",
+    rules: [{ when: "value>=10", run: "give @a emerald 1", msg: "10点でエメラルド", sound: "random.orb" }] },
+  "スコアボード表示": { type: "countup", id: "score", title: "現在の得点", use: "points", max: 100, colorF: "green", reset: "off", scoremode: "direct", scoreid: "points" },
+  "スコアボード（統計）": { type: "countup", id: "scorestat", title: "得点", use: "stat:scoreboard.points", max: 100, colorF: "blue", reset: "off", scoremode: "stat", scoreid: "points" },
+  "ダイヤ集め（新規収集）": { type: "countup", id: "diamond", title: "ダイヤ集め", use: "stat:items_obtained.diamond", max: 20, colorF: "blue", itemmode: "obtained", itemid: "diamond", reset: "off" },
+  "ダイヤ集め（所持数）": { type: "countup", id: "diamond_held", title: "ダイヤ所持数", use: "stat:inventory.item.diamond.count", max: 20, colorF: "blue", itemmode: "inventory", itemid: "diamond", reset: "off" },
+  "ダイヤチーム対決": { type: "percentage", id: "diamondvs", title: "ダイヤ収集対決", use: "stat:items_obtained.diamond", group: "red|blue", show: "both", timer: 300, itemmode: "obtained", itemid: "diamond", reset: "off" },
+  "個人・チーム記録（見出し自由）": { type: "percentage", id: "battle", title: "ゾンビ討伐対決", use: "stat:kills.zombie", group: "red|blue", show: "", timer: 300, self: "on", teamscore: "on", selflabel: "個人:", teamlabel: "チーム:", reset: "off", autoplay: "on" },
+  "ゾンビ討伐": { type: "countup", id: "z1", title: "ゾンビ討伐", use: "stat:kills.zombie", max: 10, timer: 120, tick: 10, colorF: "red", colorE: "green", mEnd: "討伐完了！", msgto: "title", onend: "remove", hideafter: 5 },
+  "台で納品対決": { type: "percentage", id: "vs", title: "納品対決", use: "stand", group: "red|blue", win: 75, timer: 180, tick: 10, name_red: "赤組", name_blue: "青組", mEnd: "{teamname}の勝ち！", msgto: "title", msgtarget: "all",
+    rules: [{ when: "leadchange", msg: "{teamname}が逆転！", once: "off" }] },
+};
+function loadExample(ex) {
+  document.querySelectorAll(".form input, .form select").forEach((el) => { if (el.closest(".rule")) return; el.value = el.tagName === "SELECT" ? el.options[0].value : ""; });
+  $("autoplay").value = "on"; $("group").value = "red|blue"; $("itemid").value = "diamond"; $("scoreid").value = "points";
+  Object.entries(ex).forEach(([k, val]) => { if ($(k) && k !== "type") $(k).value = val; });
+  $("rules").innerHTML = ""; (ex.rules || []).forEach(addRule);
+  updateItemHint();
+  updateScoreHint();
+  setType(ex.type);
+}
+// 🎲 ランダム: a random but valid bar
+function randomBar() {
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const chance = (p) => Math.random() < p;
+  const colors = Object.keys(COLORS).filter(Boolean);
+  const type = pick(["timecountdown", "countup", "countdown", "percentage"]);
+  const statNames = Object.fromEntries([...document.querySelectorAll("#uselist option")].map((o) => [o.value, o.textContent]));
+  const ex = { type, id: "r" + Math.floor(Math.random() * 90 + 10), msgto: pick(["title", "chat", "actionbar"]) };
+  if (type === "timecountdown") {
+    ex.time = pick([10, 15, 30, 45, 60, 90, 120, 180]);
+    ex.title = pick(["残り時間", "制限時間", "ラウンド", "のこり", "サバイバル"]);
+    if (chance(.3)) ex.style = "xp";
+    if (chance(.3)) ex.tformat = "ss";
+  } else if (type === "percentage") {
+    ex.use = pick(["stand", "stat:kills", "stat:jumps", "stat:damage_dealt", "stat:time_on_block.gold_block", "stat:blocks_broken"]);
+    ex.group = pick(["red|blue", "red|blue|yellow", "red|blue|yellow|green"]);
+    ex.title = pick(["対決", "陣取り", "納品対決", "チーム戦"]);
+    ex.show = pick(["", "percent", "value", "both"]);
+    if (chance(.6)) ex.timer = pick([60, 120, 180, 300]);
+    if (chance(.4)) ex.win = pick([60, 70, 80]);
+    ex.name_red = "赤組"; ex.name_blue = "青組";
+    ex.mEnd = "{teamname}の勝ち！";
+    ex.rules = chance(.6) ? [{ when: "leadchange", msg: "{teamname}が逆転！", once: "off" }] : [];
+  } else {
+    ex.use = pick(RANDOM_STATS);
+    ex.title = (statNames[ex.use] || "カウント").replace(/（.*）/, "").slice(0, 10);
+    ex.max = pick([3, 5, 10, 20, 30, 64, 100]);
+    ex.cformat = pick(["", "", "percent", "remain", "value"]);
+    if (chance(.4)) ex.timer = pick([30, 60, 120]);
+    ex.mEnd = pick(["達成！", "クリア！", "おわり！"]);
+    if (chance(.5)) ex.rules = [{ when: "1/2", msg: "半分！", sound: "note.pling" }];
+  }
+  if (type !== "percentage") { ex.colorF = pick(colors); if (chance(.6)) ex.colorM = pick(colors); if (chance(.6)) ex.colorE = pick(colors); }
+  if (chance(.5)) ex.mStart = pick(["スタート！", "はじめ！", "よーい、どん！"]);
+  if (chance(.4)) ex.mHalf = "半分！";
+  if (chance(.5)) ex.tick = pick([3, 5, 10]);
+  if (chance(.5)) ex.sound = pick(["random.levelup", "random.orb", "note.pling", "raid.horn"]);
+  if (chance(.3)) ex.onend = pick(["loop", "remove"]);
+  if (ex.onend === "remove") ex.hideafter = pick([2, 3, 5]);
+  if (type === "timecountdown" && !ex.tick && ex.time < 10) delete ex.tick;
+  return ex;
+}
+
+$("examples").innerHTML = Object.keys(EXAMPLES).map((k) => `<button type="button" class="chip">${k}</button>`).join("")
+  + `<button type="button" class="chip" id="random">🎲 ランダム</button>`;
+$("examples").querySelectorAll("button:not(#random)").forEach((b) => b.onclick = () => loadExample(EXAMPLES[b.textContent]));
+$("random").onclick = () => loadExample(randomBar());
+
+document.querySelector(".form").addEventListener("input", build);
+document.querySelector(".form").addEventListener("change", build);
+loadExample(EXAMPLES["3分タイマー"]);
+</script>
+
+</body></html>
